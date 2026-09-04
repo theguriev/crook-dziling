@@ -30,7 +30,8 @@ use std::alloc::{Layout, alloc, dealloc};
 use std::cell::RefCell;
 
 use crook_plugin_api::{
-    ABI_VERSION, Capability, Event, Manifest, Node, Request, from_bytes, to_bytes,
+    ABI_VERSION, Capability, Event, Gap, Manifest, Node, Request, Size, Tone, from_bytes,
+    to_bytes,
 };
 
 /// What the host is told this plugin is.
@@ -59,32 +60,38 @@ const MIN_MILLIS: u64 = 2_000;
 const SOUNDS: &[Sound] = &[
     Sound {
         name: "dzin",
-        title: "Dzin — a small bell struck twice",
+        label: "Dzin",
+        title: "dziling: ring like a small bell",
         wav: include_bytes!("../sounds/dzin.wav"),
     },
     Sound {
         name: "microwave",
-        title: "Microwave — four flat piezo beeps",
+        label: "Microwave",
+        title: "dziling: ring like a microwave",
         wav: include_bytes!("../sounds/microwave.wav"),
     },
     Sound {
         name: "engine",
-        title: "Engine — a blip of the throttle",
+        label: "Engine",
+        title: "dziling: ring like a throttle blip",
         wav: include_bytes!("../sounds/engine.wav"),
     },
     Sound {
         name: "coin",
-        title: "Coin — an arcade pickup",
+        label: "Coin",
+        title: "dziling: ring like an arcade coin",
         wav: include_bytes!("../sounds/coin.wav"),
     },
     Sound {
         name: "sonar",
-        title: "Sonar — one ping, left to fade",
+        label: "Sonar",
+        title: "dziling: ring like a sonar ping",
         wav: include_bytes!("../sounds/sonar.wav"),
     },
     Sound {
         name: "typewriter",
-        title: "Typewriter — the end-of-line bell",
+        label: "Typewriter",
+        title: "dziling: ring like a typewriter",
         wav: include_bytes!("../sounds/typewriter.wav"),
     },
 ];
@@ -95,6 +102,8 @@ struct Sound {
     name: &'static str,
     /// What the palette says.
     title: &'static str,
+    /// The one word the card's badge carries.
+    label: &'static str,
     /// The audio itself.
     wav: &'static [u8],
 }
@@ -125,6 +134,14 @@ thread_local! {
 // The imports the host installs. See `crook_wasm`'s `imports` module.
 #[link(wasm_import_module = "crook")]
 unsafe extern "C" {
+    #[link_name = "contribute"]
+    safe fn host_contribute(
+        slot: *const u8,
+        slot_len: i32,
+        entry: *const u8,
+        entry_len: i32,
+        order: i32,
+    );
     #[link_name = "register_action"]
     safe fn host_register_action(name: *const u8, name_len: i32, title: *const u8, title_len: i32);
     #[link_name = "request"]
@@ -136,6 +153,20 @@ unsafe extern "C" {
 /// Says something in Crook's log, at info.
 fn log(text: &str) {
     host_log(3, text.as_ptr(), text.len() as i32);
+}
+
+/// The slot a plugin may say what it is doing on, drawn on its own card.
+const CARD_SLOT: &str = "plugins.card.status";
+
+/// Puts this plugin's one entry on a slot.
+fn contribute(slot: &str, entry: &str, order: i32) {
+    host_contribute(
+        slot.as_ptr(),
+        slot.len() as i32,
+        entry.as_ptr(),
+        entry.len() as i32,
+        order,
+    );
 }
 
 /// Registers one action under this plugin's own name.
@@ -229,24 +260,59 @@ pub extern "C" fn crook_manifest() -> i64 {
 
 /// Registers what this plugin offers.
 ///
-/// Actions only. It contributes to no slot: there is nothing to draw, and a
-/// badge in the header saying "a sound will play" would be worse than the
-/// sound.
+/// One line on its own card, and one action per choice. Nothing in the header:
+/// a badge up there saying "a sound will play" would be worse than the sound.
 #[unsafe(no_mangle)]
 pub extern "C" fn crook_build() -> i32 {
+    contribute(CARD_SLOT, "status", 0);
     for sound in SOUNDS {
         register(sound.name, sound.title);
     }
     register("off", "dziling: stop ringing");
     register("on", "dziling: start ringing again");
-    register("test", "dziling: play the current sound");
     0
 }
 
-/// Nothing is drawn.
+/// One line saying which sound is chosen and whether it will ring.
+///
+/// The card lists every sound this can play and cannot know which of them is
+/// in force, because that is the guest's own state. A list of six with no mark
+/// on the live one is a list somebody has to press every row of to read.
 #[unsafe(no_mangle)]
 pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
-    match to_bytes(&Node::Empty) {
+    let node = STATE.with(|state| {
+        let state = state.borrow();
+        let sound = &SOUNDS[state.chosen];
+        Node::Row(vec![
+            Node::Text {
+                text: "Rings".into(),
+                size: Size::Small,
+                tone: Tone::Muted,
+            },
+            Node::Gap(Gap::Small),
+            Node::Badge {
+                text: sound.label.into(),
+                // Accent while it will ring and muted while it will not, so
+                // the switch is legible without reading the words.
+                tone: if state.ringing {
+                    Tone::Accent
+                } else {
+                    Tone::Muted
+                },
+            },
+            Node::Gap(Gap::Small),
+            Node::Text {
+                text: if state.ringing {
+                    "when a command finishes".into()
+                } else {
+                    "\u{2014} switched off".into()
+                },
+                size: Size::Small,
+                tone: Tone::Muted,
+            },
+        ])
+    });
+    match to_bytes(&node) {
         Ok(bytes) => packed(bytes),
         Err(_) => 0,
     }
@@ -268,12 +334,15 @@ pub extern "C" fn crook_run(name: *const u8, length: i32) -> i32 {
             STATE.with(|state| state.borrow_mut().ringing = false);
             log("dziling: off");
         }
+        // Neither of these plays anything. Both used to, and between them and
+        // "pick the sound that is already picked" they were three different
+        // buttons that made the same noise, which reads as one button that
+        // sometimes works. The card says which sound is live, so a switch does
+        // not have to demonstrate itself.
         "on" => {
             STATE.with(|state| state.borrow_mut().ringing = true);
             log("dziling: on");
-            ring();
         }
-        "test" => ring(),
         chosen => {
             if let Some(index) = SOUNDS.iter().position(|sound| sound.name == chosen) {
                 STATE.with(|state| {

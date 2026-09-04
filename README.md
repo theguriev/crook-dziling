@@ -37,8 +37,9 @@ Then restart Crook and allow it on the Plugins page. It asks for exactly two thi
 
 ## The sounds
 
-All six are in the module. Pick one from the command palette — every row below is an action named
-`theguriev/dziling/<name>`, and choosing one plays it so you are picking by ear rather than by name.
+All six are in the module. Pick one on the Plugins page — every row below has a Run button — or from
+the command palette. Choosing one plays it, so you are picking by ear rather than by name, and the
+line at the top of the card says which is live.
 
 | Name | Length | What it sounds like |
 | --- | --- | --- |
@@ -49,8 +50,8 @@ All six are in the module. Pick one from the command palette — every row below
 | `sonar` | 1.9 s | One sonar ping released into a very large room and left to fade |
 | `typewriter` | 0.9 s | A typewriter's end-of-line bell, then the carriage rattling back to its stop |
 
-Three more actions: `off` and `on` stop and start it ringing, and `test` plays the current sound
-without waiting for a command.
+Two more actions: `off` and `on` stop and start it ringing. Neither plays anything — the card says
+which sound is live and whether it will ring, so a switch does not have to demonstrate itself.
 
 ## What it does not ring at
 
