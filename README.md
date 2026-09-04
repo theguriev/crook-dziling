@@ -37,9 +37,11 @@ Then restart Crook and allow it on the Plugins page. It asks for exactly two thi
 
 ## The sounds
 
-All six are in the module. Pick one on the Plugins page — every row below has a Run button — or from
-the command palette. Choosing one plays it, so you are picking by ear rather than by name, and the
-line at the top of the card says which is live.
+All six are in the module. The plugin draws a select and a Play button at the top of its own card
+on the Plugins page: open the list, pick one — which plays it, so you are choosing by ear rather
+than by name — and Play repeats whatever is chosen. Mute stops it ringing without forgetting the
+choice. Every sound is also a command, so any of them can be bound to a chord or run from the
+palette.
 
 | Name | Length | What it sounds like |
 | --- | --- | --- |

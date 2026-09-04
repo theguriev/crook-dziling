@@ -117,11 +117,17 @@ struct State {
     chosen: usize,
     /// Whether a finished command rings.
     ringing: bool,
+    /// Whether the sound list is hanging open under the control.
+    ///
+    /// The plugin's, not the host's: `Node::Anchored` draws a panel on every
+    /// frame this is true and none where it is not, and the host tells the
+    /// plugin when a click outside shut it.
+    open: bool,
 }
 
 thread_local! {
     static STATE: RefCell<State> = const {
-        RefCell::new(State { chosen: 0, ringing: true })
+        RefCell::new(State { chosen: 0, ringing: true, open: false })
     };
     /// Where a value the host is about to read is kept alive.
     ///
@@ -177,6 +183,11 @@ fn register(name: &str, title: &str) {
         title.as_ptr(),
         title.len() as i32,
     );
+}
+
+/// Registers an action that is reachable but not offered anywhere.
+fn register_quietly(name: &str) {
+    host_register_action(name.as_ptr(), name.len() as i32, core::ptr::null(), 0);
 }
 
 /// Hands the host something to do, and says whether it took it.
@@ -268,21 +279,77 @@ pub extern "C" fn crook_build() -> i32 {
     for sound in SOUNDS {
         register(sound.name, sound.title);
     }
-    register("off", "dziling: stop ringing");
-    register("on", "dziling: start ringing again");
+    register("test", "dziling: play the current sound");
+    register("toggle", "dziling: mute or unmute");
+    // Reachable and not offered, the way a palette registers its own arrow
+    // keys: opening the list is what the control does, not something anybody
+    // should find in a palette and wonder about.
+    register_quietly("open");
+    register_quietly("close");
     0
 }
 
-/// One line saying which sound is chosen and whether it will ring.
+/// A control saying which sound is chosen, and two buttons.
 ///
-/// The card lists every sound this can play and cannot know which of them is
-/// in force, because that is the guest's own state. A list of six with no mark
-/// on the live one is a list somebody has to press every row of to read.
+/// A select rather than a list of nine identical rows, which is what this was
+/// and what made three different buttons look like one that sometimes works.
+/// Every piece of it is in the vocabulary already: `Anchored` hangs the list
+/// under the control the host places and sizes, `Pressable` makes each row of
+/// it run the action that picks that sound, and the two buttons beside it are
+/// buttons.
 #[unsafe(no_mangle)]
 pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
     let node = STATE.with(|state| {
         let state = state.borrow();
         let sound = &SOUNDS[state.chosen];
+
+        // The list, drawn only while it is open. `None` is a shut panel, and
+        // the host takes it away itself when a click lands outside.
+        let panel = state.open.then(|| {
+            Box::new(Node::Column(
+                SOUNDS
+                    .iter()
+                    .enumerate()
+                    .map(|(index, option)| Node::Pressable {
+                        content: Box::new(Node::Row(vec![
+                            // The chosen one is accented rather than ticked:
+                            // there is no tick in the vocabulary, and a tone
+                            // is what the host resolves against the theme.
+                            Node::Text {
+                                text: option.label.into(),
+                                size: Size::Body,
+                                tone: if index == state.chosen {
+                                    Tone::Accent
+                                } else {
+                                    Tone::Primary
+                                },
+                            },
+                        ])),
+                        action: option.name.into(),
+                    })
+                    .collect(),
+            ))
+        });
+
+        let control = Node::Pressable {
+            content: Box::new(Node::Row(vec![
+                Node::Badge {
+                    text: sound.label.into(),
+                    tone: if state.ringing {
+                        Tone::Accent
+                    } else {
+                        Tone::Muted
+                    },
+                },
+                Node::Gap(Gap::Small),
+                Node::Icon {
+                    name: "chevron-down".into(),
+                    tone: Tone::Muted,
+                },
+            ])),
+            action: "open".into(),
+        };
+
         Node::Row(vec![
             Node::Text {
                 text: "Rings".into(),
@@ -290,24 +357,24 @@ pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
                 tone: Tone::Muted,
             },
             Node::Gap(Gap::Small),
-            Node::Badge {
-                text: sound.label.into(),
-                // Accent while it will ring and muted while it will not, so
-                // the switch is legible without reading the words.
-                tone: if state.ringing {
-                    Tone::Accent
-                } else {
-                    Tone::Muted
-                },
+            Node::Anchored {
+                content: Box::new(control),
+                panel,
+                dismiss: "close".into(),
+            },
+            Node::Gap(Gap::Medium),
+            Node::Button {
+                label: "Play".into(),
+                action: "test".into(),
+                tone: Tone::Accent,
             },
             Node::Gap(Gap::Small),
-            Node::Text {
-                text: if state.ringing {
-                    "when a command finishes".into()
-                } else {
-                    "\u{2014} switched off".into()
-                },
-                size: Size::Small,
+            Node::Button {
+                // The switch says what pressing it does, not what is true now:
+                // a button labelled with its own state is a button people press
+                // to find out which way round it is.
+                label: if state.ringing { "Mute" } else { "Unmute" }.into(),
+                action: "toggle".into(),
                 tone: Tone::Muted,
             },
         ])
@@ -330,28 +397,33 @@ pub extern "C" fn crook_run(name: *const u8, length: i32) -> i32 {
     };
 
     match action {
-        "off" => {
-            STATE.with(|state| state.borrow_mut().ringing = false);
-            log("dziling: off");
-        }
-        // Neither of these plays anything. Both used to, and between them and
-        // "pick the sound that is already picked" they were three different
-        // buttons that made the same noise, which reads as one button that
-        // sometimes works. The card says which sound is live, so a switch does
-        // not have to demonstrate itself.
-        "on" => {
-            STATE.with(|state| state.borrow_mut().ringing = true);
-            log("dziling: on");
-        }
+        // The list is the plugin's own state; the host only draws what the
+        // last frame said and tells us when a click outside shut it.
+        "open" => STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            state.open = !state.open;
+        }),
+        "close" => STATE.with(|state| state.borrow_mut().open = false),
+        "toggle" => STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            state.ringing = !state.ringing;
+        }),
+        // The one button whose whole job is to make a noise. Everything else
+        // that used to make one — picking the sound already picked, switching
+        // the plugin back on — no longer does, because three controls that all
+        // played the current sound read as one control that sometimes works.
+        "test" => ring(),
         chosen => {
             if let Some(index) = SOUNDS.iter().position(|sound| sound.name == chosen) {
                 STATE.with(|state| {
                     let mut state = state.borrow_mut();
                     state.chosen = index;
+                    state.open = false;
+                    // Picking a sound is also asking to hear it, so a choice
+                    // made while muted unmutes rather than silently doing
+                    // nothing visible.
                     state.ringing = true;
                 });
-                // Played back, because picking a sound you cannot hear is
-                // picking a sound by its name.
                 ring();
             }
         }
