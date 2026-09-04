@@ -368,14 +368,21 @@ pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
                 action: "test".into(),
                 tone: Tone::Accent,
             },
-            Node::Gap(Gap::Small),
-            Node::Button {
-                // The switch says what pressing it does, not what is true now:
-                // a button labelled with its own state is a button people press
-                // to find out which way round it is.
-                label: if state.ringing { "Mute" } else { "Unmute" }.into(),
-                action: "toggle".into(),
-                tone: Tone::Muted,
+            // Only when it is off, and as a word rather than a switch: the
+            // card is where the choice is made, and a control for something
+            // most people set once belongs in the palette with the rest of
+            // what this answers to.
+            if state.ringing {
+                Node::Empty
+            } else {
+                Node::Row(vec![
+                    Node::Gap(Gap::Medium),
+                    Node::Text {
+                        text: "muted \u{2014} dziling: mute or unmute".into(),
+                        size: Size::Small,
+                        tone: Tone::Warning,
+                    },
+                ])
             },
         ])
     });
@@ -412,7 +419,7 @@ pub extern "C" fn crook_run(name: *const u8, length: i32) -> i32 {
         // that used to make one — picking the sound already picked, switching
         // the plugin back on — no longer does, because three controls that all
         // played the current sound read as one control that sometimes works.
-        "test" => ring(),
+        "test" => preview(),
         chosen => {
             if let Some(index) = SOUNDS.iter().position(|sound| sound.name == chosen) {
                 STATE.with(|state| {
@@ -465,15 +472,25 @@ pub extern "C" fn crook_deliver(_ticket: i32, pointer: *mut u8, length: i32) -> 
     0
 }
 
-/// Asks for the chosen sound, if ringing is on.
+/// Plays the chosen sound when a command finishing should be heard.
+///
+/// This one obeys the mute; [`preview`] does not. They were the same function
+/// once, and that made the Play button silent whenever ringing was switched
+/// off — a button whose whole job is to make a noise, obeying a switch about
+/// something else entirely, reads as a button that does not work.
 fn ring() {
-    let sound = STATE.with(|state| {
-        let state = state.borrow();
-        state.ringing.then(|| SOUNDS[state.chosen].wav)
-    });
-    let Some(wav) = sound else {
+    if STATE.with(|state| !state.borrow().ringing) {
         return;
-    };
+    }
+    preview();
+}
+
+/// Plays the chosen sound because somebody asked to hear it, mute or not.
+fn preview() {
+    let wav = STATE.with(|state| {
+        let state = state.borrow();
+        SOUNDS[state.chosen].wav
+    });
     if !ask(&Request::PlaySound {
         wav: wav.to_vec(),
         volume: VOLUME,

@@ -39,9 +39,12 @@ Then restart Crook and allow it on the Plugins page. It asks for exactly two thi
 
 All six are in the module. The plugin draws a select and a Play button at the top of its own card
 on the Plugins page: open the list, pick one — which plays it, so you are choosing by ear rather
-than by name — and Play repeats whatever is chosen. Mute stops it ringing without forgetting the
-choice. Every sound is also a command, so any of them can be bound to a chord or run from the
-palette.
+than by name — and Play repeats whatever is chosen. Play always plays, muted or not: a button whose
+whole job is to make a noise should not obey a switch about something else.
+
+`dziling: mute or unmute` stops it ringing when a command finishes, without forgetting the choice.
+It lives in the command palette rather than on the card, because it is set once. Every sound is a
+command too, so any of them can be bound to a chord.
 
 | Name | Length | What it sounds like |
 | --- | --- | --- |
