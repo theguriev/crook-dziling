@@ -1,0 +1,30 @@
+[package]
+name = "crook-dziling"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "A Crook plugin that rings when a command finishes."
+repository = "https://github.com/theguriev/crook-dziling"
+
+[lib]
+# `cdylib` is what `wasm32-unknown-unknown` needs to produce a module with
+# exports rather than a Rust rlib nothing outside Rust can load.
+crate-type = ["cdylib"]
+
+[dependencies]
+# The wire, from the host's own repository. Both sides link the same crate on
+# purpose: a format written down twice is a format that will disagree with
+# itself. Pinned to a revision rather than a branch so that a build today and a
+# build next year produce the same module.
+crook_plugin_api = { git = "https://github.com/theguriev/crook.git", branch = "main" }
+
+[profile.release]
+# The module is mostly the six sounds, but the code around them may as well be
+# small: this is loaded into every window at startup.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+# A guest that unwinds has nowhere to unwind to — the host sees a trap either
+# way, and the unwinding machinery is dead weight in the module.
+panic = "abort"
