@@ -14,9 +14,14 @@ crate-type = ["cdylib"]
 [dependencies]
 # The wire, from the host's own repository. Both sides link the same crate on
 # purpose: a format written down twice is a format that will disagree with
-# itself. Pinned to a revision rather than a branch so that a build today and a
-# build next year produce the same module.
-crook_plugin_api = { git = "https://github.com/theguriev/crook.git", branch = "main" }
+# itself.
+#
+# The `dziling` branch, not `main`, and that is temporary: this plugin needs
+# `Capability::PlaySound`, the `CommandFinished` event and `Node::Explained`,
+# and all three are on that branch waiting to be merged. Point this at a tag
+# once they land — a branch moves under a build, which is exactly what a plugin
+# that has to agree with its host cannot afford.
+crook_plugin_api = { git = "https://github.com/theguriev/crook.git", branch = "dziling" }
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be
