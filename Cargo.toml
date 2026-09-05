@@ -16,12 +16,11 @@ crate-type = ["cdylib"]
 # purpose: a format written down twice is a format that will disagree with
 # itself.
 #
-# The `dziling` branch, not `main`, and that is temporary: this plugin needs
+# A branch moves under a build, which is exactly what a plugin that has to
+# agree with its host cannot afford — so this is the commit that landed
 # `Capability::PlaySound`, the `CommandFinished` event and `Node::Explained`,
-# and all three are on that branch waiting to be merged. Point this at a tag
-# once they land — a branch moves under a build, which is exactly what a plugin
-# that has to agree with its host cannot afford.
-crook_plugin_api = { git = "https://github.com/theguriev/crook.git", branch = "dziling" }
+# and it stays there until there is a reason to move it.
+crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "e7e4520" }
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be

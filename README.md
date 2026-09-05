@@ -8,7 +8,7 @@ onomatopoeia for a small bell — the English *ding*.)
 
 ## What it needs
 
-Crook with ABI 3 or later — the version that added `Capability::PlaySound` and the
+Crook with ABI 5 or later — the version that added `Capability::PlaySound` and the
 `CommandFinished` event. Older builds will load the module, see an ABI they do not know, and say so
 by name in the log rather than running it.
 
