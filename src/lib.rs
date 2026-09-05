@@ -53,7 +53,7 @@ const VOLUME: u8 = 70;
 /// took long enough that a person looked away.
 const MIN_MILLIS: u64 = 2_000;
 
-/// The sounds, in the order the palette lists them.
+/// The sounds, in the order the list on the card offers them.
 ///
 /// `dzin` first because it is the default: a small bell is the one of these
 /// that survives being heard forty times a day.
@@ -61,48 +61,40 @@ const SOUNDS: &[Sound] = &[
     Sound {
         name: "dzin",
         label: "Dzin",
-        title: "dziling: ring like a small bell",
         wav: include_bytes!("../sounds/dzin.wav"),
     },
     Sound {
         name: "microwave",
         label: "Microwave",
-        title: "dziling: ring like a microwave",
         wav: include_bytes!("../sounds/microwave.wav"),
     },
     Sound {
         name: "engine",
         label: "Engine",
-        title: "dziling: ring like a throttle blip",
         wav: include_bytes!("../sounds/engine.wav"),
     },
     Sound {
         name: "coin",
         label: "Coin",
-        title: "dziling: ring like an arcade coin",
         wav: include_bytes!("../sounds/coin.wav"),
     },
     Sound {
         name: "sonar",
         label: "Sonar",
-        title: "dziling: ring like a sonar ping",
         wav: include_bytes!("../sounds/sonar.wav"),
     },
     Sound {
         name: "typewriter",
         label: "Typewriter",
-        title: "dziling: ring like a typewriter",
         wav: include_bytes!("../sounds/typewriter.wav"),
     },
 ];
 
 /// One sound this plugin can ring.
 struct Sound {
-    /// What the action after `dziling/` is called.
+    /// What the action after `dziling/` is called, and what a chord binds.
     name: &'static str,
-    /// What the palette says.
-    title: &'static str,
-    /// The one word the card's badge carries.
+    /// The one word the list and the badge carry.
     label: &'static str,
     /// The audio itself.
     wav: &'static [u8],
@@ -273,30 +265,122 @@ pub extern "C" fn crook_manifest() -> i64 {
 ///
 /// One line on its own card, and one action per choice. Nothing in the header:
 /// a badge up there saying "a sound will play" would be worse than the sound.
+///
+/// # Why only one of them is offered
+///
+/// A command is an action a person should be able to *find*; the card lists
+/// every one of them under the contribution, as a row with a Run button. So a
+/// plugin that draws a select and a play mark and also offers eight commands
+/// gets the same eight things twice on the same card — once in the shape it
+/// chose and once in the shape the card invented, the second one three times
+/// longer than the first. Picking a sound and hearing it are what the control
+/// is *for*, so they are registered quietly and the list collapses to the one
+/// thing the control does not do.
+///
+/// What that costs is real and is paid for in [`sheet`]: the six names leave
+/// the palette and the Keyboard Shortcuts page with their titles, so the note
+/// under the control writes them out. A name nobody can read is a chord nobody
+/// can bind.
 #[unsafe(no_mangle)]
 pub extern "C" fn crook_build() -> i32 {
     contribute(CARD_SLOT, "status", 0);
-    for sound in SOUNDS {
-        register(sound.name, sound.title);
-    }
-    register("test", "dziling: play the current sound");
-    register("toggle", "dziling: mute or unmute");
     // Reachable and not offered, the way a palette registers its own arrow
-    // keys: opening the list is what the control does, not something anybody
-    // should find in a palette and wonder about.
+    // keys: the list on the card is where a sound is picked, and opening that
+    // list is what the control does rather than something anybody should find
+    // in a palette and wonder about.
+    for sound in SOUNDS {
+        register_quietly(sound.name);
+    }
+    register_quietly("test");
     register_quietly("open");
     register_quietly("close");
+    // The one thing the control does not do, and the one worth a palette
+    // entry: muting is set once and then left, which is what a palette is for
+    // and what a control somebody has to open a settings page to reach is not.
+    register("toggle", "dziling: mute or unmute");
     0
 }
 
-/// A control saying which sound is chosen, and two buttons.
+/// Everything the card's list used to say, hung off the control that says
+/// which sound is chosen.
+///
+/// It is here because it is about *this* control, and a note about a control
+/// belongs on it: the card's version was eight action names in a column under
+/// a select that already reached seven of them. It costs the wire its bytes on
+/// every frame rather than only on the frames a pointer is over the chip —
+/// which is the trade [`Node::Explained`] is, and the alternative was a call
+/// into this module every time a mouse crossed it.
+///
+/// It writes the six action names out because nothing else does any more.
+/// [`crook_build`] registers them quietly, so they are gone from the palette
+/// and from the Keyboard Shortcuts page; they are still bindable, and this is
+/// where somebody finds out what to bind.
+fn sheet(state: &State) -> Node {
+    Node::Column(vec![
+        // What the row's badge says, said again with the word the badge cannot
+        // carry: a muted-toned pill and an accented one are one glance apart,
+        // and this is the surface with room to say which is which.
+        Node::Row(vec![
+            Node::Text {
+                text: SOUNDS[state.chosen].label.into(),
+                size: Size::Body,
+                tone: Tone::Primary,
+            },
+            Node::Fill,
+            Node::Badge {
+                text: if state.ringing { "ringing" } else { "muted" }.into(),
+                tone: if state.ringing {
+                    Tone::Accent
+                } else {
+                    Tone::Muted
+                },
+            },
+        ]),
+        Node::Note {
+            text: "Rings when a command that ran for two seconds or more finishes.".into(),
+            tone: Tone::Muted,
+        },
+        Node::Rule,
+        Node::Note {
+            text: "Six sounds. Click to choose one \u{2014} picking it plays it, so the \
+                   choice is made by ear."
+                .into(),
+            tone: Tone::Muted,
+        },
+        Node::Note {
+            text: "Bind one to a chord by name: theguriev/dziling/dzin, and microwave, \
+                   engine, coin, sonar, typewriter."
+                .into(),
+            tone: Tone::Muted,
+        },
+        Node::Note {
+            text: "The triangle plays whichever is chosen, muted or not.".into(),
+            tone: Tone::Muted,
+        },
+        Node::Note {
+            text: "\u{201c}dziling: mute or unmute\u{201d}, in the palette, stops the ring \
+                   without switching the plugin off."
+                .into(),
+            tone: Tone::Muted,
+        },
+    ])
+}
+
+/// A select saying which sound is chosen, and a mark that plays it.
 ///
 /// A select rather than a list of nine identical rows, which is what this was
 /// and what made three different buttons look like one that sometimes works.
 /// Every piece of it is in the vocabulary already: `Anchored` hangs the list
-/// under the control the host places and sizes, `Pressable` makes each row of
-/// it run the action that picks that sound, and the two buttons beside it are
-/// buttons.
+/// under the control the host places and sizes, `Explained` hangs [`sheet`]
+/// over it while the pointer is on it, and `Pressable` makes each row of the
+/// list run the action that picks that sound.
+///
+/// The play mark is a `Pressable` and not a `Button` for the reason it stopped
+/// looking like a player: a `Button` is drawn the way the card's own Run
+/// buttons are drawn, so the one control this plugin exists for was a grey box
+/// reading "Play" stacked above eight grey boxes reading "Run". A triangle and
+/// a word, on a ground that appears when it is reached for, is a thing that
+/// plays something.
 #[unsafe(no_mangle)]
 pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
     let node = STATE.with(|state| {
@@ -331,23 +415,27 @@ pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
             ))
         });
 
-        let control = Node::Pressable {
-            content: Box::new(Node::Row(vec![
-                Node::Badge {
-                    text: sound.label.into(),
-                    tone: if state.ringing {
-                        Tone::Accent
-                    } else {
-                        Tone::Muted
+        let select = Node::Anchored {
+            content: Box::new(Node::Pressable {
+                content: Box::new(Node::Row(vec![
+                    Node::Badge {
+                        text: sound.label.into(),
+                        tone: if state.ringing {
+                            Tone::Accent
+                        } else {
+                            Tone::Muted
+                        },
                     },
-                },
-                Node::Gap(Gap::Small),
-                Node::Icon {
-                    name: "chevron-down".into(),
-                    tone: Tone::Muted,
-                },
-            ])),
-            action: "open".into(),
+                    Node::Gap(Gap::Small),
+                    Node::Icon {
+                        name: "chevron-down".into(),
+                        tone: Tone::Muted,
+                    },
+                ])),
+                action: "open".into(),
+            }),
+            panel,
+            dismiss: "close".into(),
         };
 
         Node::Row(vec![
@@ -357,28 +445,46 @@ pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
                 tone: Tone::Muted,
             },
             Node::Gap(Gap::Small),
-            Node::Anchored {
-                content: Box::new(control),
-                panel,
-                dismiss: "close".into(),
+            // Explained only while the list is shut. The panel is drawn by
+            // this same subtree, so a pointer down in the list still counts as
+            // a pointer on the chip — and the note would come up beside the
+            // list it is a note about, over the sounds somebody is reading.
+            if state.open {
+                select
+            } else {
+                Node::Explained {
+                    content: Box::new(select),
+                    explanation: Box::new(sheet(&state)),
+                }
             },
             Node::Gap(Gap::Medium),
-            Node::Button {
-                label: "Play".into(),
+            Node::Pressable {
+                content: Box::new(Node::Row(vec![
+                    Node::Icon {
+                        name: "play".into(),
+                        tone: Tone::Accent,
+                    },
+                    Node::Gap(Gap::Small),
+                    Node::Text {
+                        text: "Play".into(),
+                        size: Size::Small,
+                        tone: Tone::Accent,
+                    },
+                ])),
                 action: "test".into(),
-                tone: Tone::Accent,
             },
-            // Only when it is off, and as a word rather than a switch: the
-            // card is where the choice is made, and a control for something
-            // most people set once belongs in the palette with the rest of
-            // what this answers to.
+            // One word, only when it is off. The badge going quiet says it
+            // too, but a tone is a thing you notice once you know to look; how
+            // to undo it is in the note rather than here, because a row that
+            // grew an instruction whenever it was muted was a row that changed
+            // shape under the pointer.
             if state.ringing {
                 Node::Empty
             } else {
                 Node::Row(vec![
                     Node::Gap(Gap::Medium),
                     Node::Text {
-                        text: "muted \u{2014} dziling: mute or unmute".into(),
+                        text: "muted".into(),
                         size: Size::Small,
                         tone: Tone::Warning,
                     },

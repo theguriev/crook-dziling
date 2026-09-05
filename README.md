@@ -37,14 +37,15 @@ Then restart Crook and allow it on the Plugins page. It asks for exactly two thi
 
 ## The sounds
 
-All six are in the module. The plugin draws a select and a Play button at the top of its own card
-on the Plugins page: open the list, pick one — which plays it, so you are choosing by ear rather
-than by name — and Play repeats whatever is chosen. Play always plays, muted or not: a button whose
-whole job is to make a noise should not obey a switch about something else.
+All six are in the module. The plugin draws its own control at the top of its card on the Plugins
+page — a chip saying which sound is chosen, and a play mark beside it:
 
-`dziling: mute or unmute` stops it ringing when a command finishes, without forgetting the choice.
-It lives in the command palette rather than on the card, because it is set once. Every sound is a
-command too, so any of them can be bound to a chord.
+- **Open the chip** for the six. Picking one plays it, so the choice is made by ear rather than by
+  name, and picking one while muted unmutes.
+- **The play mark** plays whichever is chosen, muted or not. A control whose whole job is to make a
+  noise should not obey a switch about something else.
+- **Rest on the chip** and it says the rest: what it rings on, whether it is ringing, the six names
+  and how to mute.
 
 | Name | Length | What it sounds like |
 | --- | --- | --- |
@@ -55,8 +56,28 @@ command too, so any of them can be bound to a chord.
 | `sonar` | 1.9 s | One sonar ping released into a very large room and left to fade |
 | `typewriter` | 0.9 s | A typewriter's end-of-line bell, then the carriage rattling back to its stop |
 
-Two more actions: `off` and `on` stop and start it ringing. Neither plays anything — the card says
-which sound is live and whether it will ring, so a switch does not have to demonstrate itself.
+## Reaching it by name
+
+One command: `dziling: mute or unmute`, in the palette. It stops the ring when a command finishes
+without forgetting the choice and without switching the plugin off, and it is the one thing the
+control on the card does not do.
+
+Everything else is registered *quietly* — reachable by name, offered nowhere. That is deliberate.
+The card lists a plugin's commands underneath its contribution, one row and one Run button each, so
+offering the six sounds and the preview put the same seven things on the same card twice: once as
+the control, and once as a column three times longer in a shape the card invented.
+
+**What you lose:** the six stop appearing in the command palette, so typing "micro" no longer finds
+`dziling: ring like a microwave`, and they are gone from the Keyboard Shortcuts page too. **What
+you keep:** they are still actions, so a chord still binds them —
+
+```json
+{ "key": "ctrl+alt+m", "action": "theguriev/dziling/microwave" }
+```
+
+The names are `theguriev/dziling/` followed by `dzin`, `microwave`, `engine`, `coin`, `sonar`,
+`typewriter`, `test` (play the chosen sound) or `toggle`. The note on the chip writes them out as
+well, because a name written down nowhere is a chord nobody can bind.
 
 ## What it does not ring at
 
