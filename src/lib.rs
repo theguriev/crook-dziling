@@ -382,7 +382,12 @@ fn sheet(state: &State) -> Node {
 /// a word, on a ground that appears when it is reached for, is a thing that
 /// plays something.
 #[unsafe(no_mangle)]
-pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
+pub extern "C" fn crook_render(request: *mut u8, length: i32) -> i64 {
+    // Freed rather than read: what this draws is the same on every slot it is
+    // contributed to, and bytes the host allocated through `crook_alloc` and
+    // nobody gave back are a leak once a frame.
+    let _ = unsafe { taken(request, length) };
+
     let node = STATE.with(|state| {
         let state = state.borrow();
         let sound = &SOUNDS[state.chosen];
@@ -499,13 +504,31 @@ pub extern "C" fn crook_render(_slot: *const u8, _slot_len: i32) -> i64 {
 }
 
 /// Runs one of the actions above.
+///
+/// # Why it takes four numbers rather than two
+///
+/// Because that is what the host calls: `crook_run(name, name_len, argument,
+/// argument_len)`. The argument is whatever the thing that was pressed had to
+/// say — the key of a chosen row, the entry of a menu — and nothing this
+/// plugin draws has anything to say, so it is taken and dropped. It cannot be
+/// left off the signature: wasmi looks the export up *by type*, so a
+/// two-parameter `crook_run` is not a `crook_run` the host can find, and every
+/// action in this plugin failed at that lookup rather than inside it. Which is
+/// what a select that does not open and a play mark that makes no noise both
+/// were.
+///
+/// Both strings were written through [`crook_alloc`], so both are freed here
+/// rather than leaked once per press.
 #[unsafe(no_mangle)]
-pub extern "C" fn crook_run(name: *const u8, length: i32) -> i32 {
-    if name.is_null() || length <= 0 {
-        return 0;
-    }
-    let bytes = unsafe { std::slice::from_raw_parts(name, length as usize) };
-    let Ok(action) = std::str::from_utf8(bytes) else {
+pub extern "C" fn crook_run(
+    name: *mut u8,
+    length: i32,
+    argument: *mut u8,
+    argument_len: i32,
+) -> i32 {
+    let bytes = unsafe { taken(name, length) };
+    let _ = unsafe { taken(argument, argument_len) };
+    let Ok(action) = std::str::from_utf8(&bytes) else {
         return 0;
     };
 
