@@ -1,8 +1,21 @@
-//! dziling: a Crook plugin that rings when a command finishes.
+//! dziling: a Crook plugin that rings when something finishes.
 //!
-//! It does one thing. When the shell says a command ended — OSC 133 `D`, which
-//! is the same mark Crook's own blocks are cut by — this asks the host to play
-//! a short sound. That is the whole plugin.
+//! It does one thing, and it listens for two ways of being told about it.
+//!
+//! The first is the shell saying a command ended — OSC 133 `D`, the same mark
+//! Crook's own blocks are cut by. That covers everything a person waits at a
+//! prompt for, and it covers nothing they leave running: a program that holds
+//! the terminal until they close it ends no command the shell can see, so an
+//! agent that finished a turn an hour ago has never once said `D`.
+//!
+//! The second is for exactly that case. A program with something to say rings
+//! BEL, and [`Event::Bell`] carries whether a command was running when it did
+//! — which is what separates the bell that means "I am done, come back" from
+//! the one a shell rings at an ambiguous Tab completion. Only the first is
+//! worth a sound.
+//!
+//! Either way what happens next is the same: ask the host to play something
+//! short. That is the whole plugin.
 //!
 //! # Why it asks rather than plays
 //!
@@ -30,8 +43,7 @@ use std::alloc::{Layout, alloc, dealloc};
 use std::cell::RefCell;
 
 use crook_plugin_api::{
-    ABI_VERSION, Capability, Event, Gap, Manifest, Node, Request, Size, Tone, from_bytes,
-    to_bytes,
+    ABI_VERSION, Capability, Event, Gap, Manifest, Node, Request, Size, Tone, from_bytes, to_bytes,
 };
 
 /// What the host is told this plugin is.
@@ -248,12 +260,17 @@ pub extern "C" fn crook_manifest() -> i64 {
         abi: ABI_VERSION,
         id: ID.into(),
         name: "dziling".into(),
-        description: "Rings a short sound when a command finishes.".into(),
+        description: "Rings a short sound when something finishes.".into(),
         version: env!("CARGO_PKG_VERSION").into(),
-        // Exactly two, and both are things a person can picture: it hears that
-        // commands ended, and it makes a noise. It asks for no network, no
-        // files, no clipboard and nothing about the tabs.
-        capabilities: vec![Capability::WatchCommands, Capability::PlaySound],
+        // Three, and every one of them is a thing a person can picture: it
+        // hears that commands ended, it hears a program ask for attention, and
+        // it makes a noise. It asks for no network, no files, no clipboard and
+        // nothing about the tabs.
+        capabilities: vec![
+            Capability::WatchCommands,
+            Capability::WatchBells,
+            Capability::PlaySound,
+        ],
     };
     match to_bytes(&manifest) {
         Ok(bytes) => packed(bytes),
@@ -582,6 +599,17 @@ pub extern "C" fn crook_event(pointer: *mut u8, length: i32) -> i32 {
             // Unknown means it was already running when Crook started
             // watching, which is exactly the long-running case this is for.
             if took_millis.unwrap_or(u64::MAX) >= MIN_MILLIS {
+                ring();
+            }
+        }
+        // No threshold on this one, and it is not an oversight. What
+        // `MIN_MILLIS` is for is the commands nobody is waiting on, and a
+        // program still holding the terminal is by definition not one of
+        // those: somebody started it and it is still going. The bell that
+        // needs filtering out is the shell's own, at its own prompt, and
+        // `while_running` is already that filter.
+        Event::Bell { while_running, .. } => {
+            if while_running {
                 ring();
             }
         }
