@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "crook_plugin_api"
 version = "0.1.0"
-source = "git+https://github.com/theguriev/crook.git?rev=e7e4520#e7e45201fcf8c4a0b57ae4fd8f8bdd2123ccbac3"
+source = "git+https://github.com/theguriev/crook.git?rev=4af28de#4af28de780f16a62cbfcc3221662e3f3d0a4ee11"
 dependencies = [
  "postcard",
  "serde",

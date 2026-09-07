@@ -17,10 +17,11 @@ crate-type = ["cdylib"]
 # itself.
 #
 # A branch moves under a build, which is exactly what a plugin that has to
-# agree with its host cannot afford — so this is the commit that landed
-# `Capability::PlaySound`, the `CommandFinished` event and `Node::Explained`,
-# and it stays there until there is a reason to move it.
-crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "e7e4520" }
+# agree with its host cannot afford — so this is a commit rather than a branch,
+# and it stays on one until there is a reason to move it. The reason this time
+# was the number: the pin spoke plugin API 5 and the host had reached 7, so a
+# build of this plugin was one the host refused at load.
+crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "4af28de" }
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be
