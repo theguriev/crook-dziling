@@ -19,9 +19,13 @@ crate-type = ["cdylib"]
 # A branch moves under a build, which is exactly what a plugin that has to
 # agree with its host cannot afford — so this is a commit rather than a branch,
 # and it stays on one until there is a reason to move it. The reason this time
-# was the number: the pin spoke plugin API 5 and the host had reached 7, so a
-# build of this plugin was one the host refused at load.
-crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "4af28de" }
+# was `Event::Bell`: ringing when an agent finishes a turn needs plugin API 8,
+# and the pin spoke 7.
+#
+# This one is not on `main` yet — it is the head of theguriev/crook#60, which
+# is where the event landed. Repoint it at the commit that lands on `main` when
+# the pull request is merged.
+crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "5f1d855" }
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be
