@@ -12,16 +12,16 @@ repository = "https://github.com/theguriev/crook-dziling"
 crate-type = ["cdylib"]
 
 [dependencies]
-# The wire, from the host's own repository. Both sides link the same crate on
-# purpose: a format written down twice is a format that will disagree with
-# itself.
+# The wire, published. Both sides link the same crate on purpose: a format
+# written down twice is a format that will disagree with itself.
 #
-# A branch moves under a build, which is exactly what a plugin that has to
-# agree with its host cannot afford — so this is a commit rather than a branch,
-# and it stays on one until there is a reason to move it. The reason this time
-# was `Event::Bell`: ringing when an agent finishes a turn needs plugin API 8,
-# and the pin spoke 7.
-crook_plugin_api = { git = "https://github.com/theguriev/crook.git", rev = "c438a10" }
+# `0.8` is Cargo's way of writing "plugin ABI 8" — the crate is versioned
+# `0.<abi>.<patch>`, and a host loads one ABI and refuses every other by name,
+# so what Cargo resolves is exactly the set of releases this can be loaded by.
+# It used to be a commit in the terminal's own repository, which is private:
+# nobody else could build this, and the registry that builds every plugin from
+# source could not either.
+crook_plugin_api = "0.8"
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be
