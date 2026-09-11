@@ -46,6 +46,12 @@ use crook_plugin_api::{
     ABI_VERSION, Capability, Event, Gap, Manifest, Node, Request, Size, Tone, from_bytes, to_bytes,
 };
 
+// The plugin's face, for the Plugins page and the Store. Inside the module
+// rather than beside it, for the same reason the sounds are: what says what
+// the plugin is travels with it. A custom section, not data — it costs no
+// memory and no fuel.
+crook_plugin_api::icon!("../assets/icon.png");
+
 /// What the host is told this plugin is.
 const ID: &str = "theguriev/dziling";
 
@@ -656,5 +662,17 @@ fn preview() {
         // this plugin's own scheduling. One line, and no retry: a chime that
         // arrives late is worse than one that does not arrive.
         log("dziling: the host would not take the sound");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_icon_in_the_module_is_a_png() {
+        // A wrong path fails at compile time; a wrong file fails here, on the
+        // machine that runs the tests, rather than on the Plugins page.
+        assert!(CROOK_ICON.starts_with(b"\x89PNG\r\n\x1a\n"));
     }
 }
