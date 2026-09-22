@@ -139,9 +139,11 @@ strongest partials per slice, which is how a sound is checked without listening 
 ## Building it
 
 ```sh
-rustup target add wasm32-unknown-unknown
 cargo build --release --target wasm32-unknown-unknown
 ```
+
+`rust-toolchain.toml` names the channel and the target, so rustup installs both on the first
+command run here.
 
 The module lands at `target/wasm32-unknown-unknown/release/crook_dziling.wasm`. It is about 670 KB,
 of which 652 KB is the six sounds.

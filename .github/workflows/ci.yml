@@ -16,13 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # There is no rust-toolchain.toml here, so the target is asked for by
-      # name: the runner's default toolchain builds for the host and nothing
-      # else until it is.
+      # The toolchain file names the channel, the components and the wasm
+      # target, so there is nothing to pin twice.
       - name: Install the toolchain
-        run: |
-          rustup show
-          rustup target add wasm32-unknown-unknown
+        run: rustup show
 
       - uses: Swatinem/rust-cache@v2
 
@@ -64,9 +61,7 @@ jobs:
           # one — which a shallow checkout has nothing to walk.
           fetch-depth: 0
       - name: Install the toolchain
-        run: |
-          rustup show
-          rustup target add wasm32-unknown-unknown
+        run: rustup show
       - uses: Swatinem/rust-cache@v2
 
       # Built here rather than downloaded from the job above, so that what a
