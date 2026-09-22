@@ -21,7 +21,7 @@ crate-type = ["cdylib"]
 # It used to be a commit in the terminal's own repository, which is private:
 # nobody else could build this, and the registry that builds every plugin from
 # source could not either.
-crook_plugin_api = "0.8"
+crook_plugin_api = "0.8.1"
 
 [profile.release]
 # The module is mostly the six sounds, but the code around them may as well be
