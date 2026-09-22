@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # There is no rust-toolchain.toml here, so the target is asked for by
+      # name: the runner's default toolchain builds for the host and nothing
+      # else until it is.
+      - name: Install the toolchain
+        run: |
+          rustup show
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      # No clippy step, and it is not an oversight: the five exports the host
+      # calls take `*mut u8`, which `clippy::not_unsafe_ptr_arg_deref` denies
+      # outright, and quieting it means either an `allow` on each export or
+      # the `i32`-and-`taken()` shape the other plugins use. Both are changes
+      # to what this module exports, which is not a thing to slip into a
+      # workflow that had not existed until now.
+
+      - name: Build the plugin
+        run: |
+          cargo build --release --target wasm32-unknown-unknown
+          cp target/wasm32-unknown-unknown/release/crook_dziling.wasm plugin.wasm
+          ls -l plugin.wasm
+
+      # So that a reviewer can see what a release will contain before it is one.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin.wasm
+          path: plugin.wasm
+
+  release:
+    name: Release
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Every commit and every tag: the notes below are read out of
+          # CHANGELOG.md, and when a tag was made by hand and has no section
+          # there, script/release-notes walks back to the previous tag to write
+          # one — which a shallow checkout has nothing to walk.
+          fetch-depth: 0
+      - name: Install the toolchain
+        run: |
+          rustup show
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      # Built here rather than downloaded from the job above, so that what a
+      # person installs is a file this workflow compiled from this tag's
+      # source and nothing else has touched.
+      - name: Build the plugin
+        run: |
+          cargo build --release --target wasm32-unknown-unknown
+          cp target/wasm32-unknown-unknown/release/crook_dziling.wasm plugin.wasm
+          sha256sum plugin.wasm > plugin.wasm.sha256
+
+      # What the release page says, from CHANGELOG.md. script/release writes
+      # the `## vX.Y.Z` section there in the same commit the tag sits on, so
+      # the file in the repository and the page cannot disagree; a tag cut by
+      # hand has no section, and then the same generator runs here and the
+      # notes say that is what happened.
+      - name: The release notes
+        run: ./script/release-notes "$GITHUB_REF_NAME" > changes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            plugin.wasm
+            plugin.wasm.sha256
+          body_path: changes.md
