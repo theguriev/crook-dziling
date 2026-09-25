@@ -90,10 +90,11 @@ the control, and once as a column three times longer in a shape the card invente
 
 **What you lose:** the six stop appearing in the command palette, so typing "micro" no longer finds
 `dziling: ring like a microwave`, and they are gone from the Keyboard Shortcuts page too. **What
-you keep:** they are still actions, so a chord still binds them —
+you keep:** they are still actions, so a chord still binds them — one line in Crook's
+`keybindings.json`, which is a list of these:
 
 ```json
-{ "key": "ctrl+alt+m", "action": "theguriev/dziling/microwave" }
+{ "key": "ctrl+alt+m", "command": "theguriev/dziling/microwave" }
 ```
 
 The names are `theguriev/dziling/` followed by `dzin`, `microwave`, `engine`, `coin`, `sonar`,
