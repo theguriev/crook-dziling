@@ -33,9 +33,18 @@ jobs:
       # to what this module exports, which is not a thing to slip into a
       # workflow that had not existed until now.
 
+      # The icon check in `src/lib.rs` is written for the machine that runs the
+      # tests, and until this step no machine did.
+      - name: Test
+        run: cargo test --locked
+
+      # `--locked`, as the registry builds it: without it cargo quietly
+      # rewrites a Cargo.lock that no longer matches Cargo.toml, this passes,
+      # and the first build to refuse the stale file is the registry's, on
+      # the commit already named in its pull request.
       - name: Build the plugin
         run: |
-          cargo build --release --target wasm32-unknown-unknown
+          cargo build --release --locked --target wasm32-unknown-unknown
           cp target/wasm32-unknown-unknown/release/crook_dziling.wasm plugin.wasm
           ls -l plugin.wasm
 
@@ -69,7 +78,7 @@ jobs:
       # source and nothing else has touched.
       - name: Build the plugin
         run: |
-          cargo build --release --target wasm32-unknown-unknown
+          cargo build --release --locked --target wasm32-unknown-unknown
           cp target/wasm32-unknown-unknown/release/crook_dziling.wasm plugin.wasm
           sha256sum plugin.wasm > plugin.wasm.sha256
 
